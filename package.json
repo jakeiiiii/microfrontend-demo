@@ -1,0 +1,12 @@
+{
+  "name": "microfrontend-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Microfrontend demo with Angular 14 and Angular 20 running simultaneously",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
