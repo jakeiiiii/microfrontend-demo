@@ -91,3 +91,15 @@ nav {
   flex: 1;
   min-width: 300px;
 }
+
+.section-label {
+  font-size: 1.1rem;
+  color: #1a1a2e;
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.section-label:first-child {
+  margin-top: 0;
+}

@@ -1,66 +1,300 @@
 (function () {
   'use strict';
 
-  var MFE_REGISTRY = {
-    angular14: {
-      scripts: ['/mfe/angular14/runtime.js', '/mfe/angular14/main.js'],
+  var container = document.getElementById('mfe-container');
+
+  // =========================================================================
+  // Module Federation loader (for Angular 14 MFEs)
+  // =========================================================================
+
+  var MF_REMOTES = {
+    mfeAngular14: {
+      remoteEntry: '/mfe/angular14/remoteEntry.js',
+      exposedModule: './bootstrap',
       element: '<mfe-angular14></mfe-angular14>'
     },
-    angular20: {
-      scripts: ['/mfe/angular20/main.js'],
-      element: '<mfe-angular20></mfe-angular20>'
+    mfeAngular14B: {
+      remoteEntry: '/mfe/angular14-b/remoteEntry.js',
+      exposedModule: './bootstrap',
+      element: '<mfe-angular14-b></mfe-angular14-b>'
     }
   };
 
-  var loadedScripts = {};
-  var container = document.getElementById('mfe-container');
+  var mfScriptsLoaded = {};
 
-  function loadScript(src) {
-    if (loadedScripts[src]) return loadedScripts[src];
-    loadedScripts[src] = new Promise(function (resolve, reject) {
+  function loadRemoteEntryScript(url) {
+    if (mfScriptsLoaded[url]) return mfScriptsLoaded[url];
+    mfScriptsLoaded[url] = new Promise(function (resolve, reject) {
       var script = document.createElement('script');
-      script.src = src;
+      script.src = url;
       script.onload = resolve;
-      script.onerror = function () { reject(new Error('Failed to load ' + src)); };
-      document.body.appendChild(script);
+      script.onerror = function () { reject(new Error('Failed to load ' + url)); };
+      document.head.appendChild(script);
     });
-    return loadedScripts[src];
+    return mfScriptsLoaded[url];
   }
 
-  function loadMfe(name) {
-    var mfe = MFE_REGISTRY[name];
-    if (!mfe) return Promise.reject(new Error('Unknown MFE: ' + name));
-    return Promise.all(mfe.scripts.map(loadScript)).then(function () {
-      return mfe.element;
+  var mfSharedScope = null;
+
+  function initMFContainer(containerName) {
+    var cont = window[containerName];
+    if (!cont) throw new Error('Container ' + containerName + ' not found on window');
+
+    if (!mfSharedScope) {
+      mfSharedScope = {};
+    }
+
+    return Promise.resolve(cont.init(mfSharedScope)).then(function () {
+      return cont;
     });
   }
+
+  function loadMFExposedModule(containerName, moduleName) {
+    var cont = window[containerName];
+    return cont.get(moduleName).then(function (factory) {
+      return factory();
+    });
+  }
+
+  var mfInitialized = {};
+
+  function loadAngular14Mfe(name) {
+    var remote = MF_REMOTES[name];
+    if (!remote) return Promise.reject(new Error('Unknown MF remote: ' + name));
+
+    if (mfInitialized[name]) return Promise.resolve(remote.element);
+
+    return loadRemoteEntryScript(remote.remoteEntry)
+      .then(function () { return initMFContainer(name); })
+      .then(function () { return loadMFExposedModule(name, remote.exposedModule); })
+      .then(function () {
+        mfInitialized[name] = true;
+        return remote.element;
+      });
+  }
+
+  function loadAllAngular14Mfes() {
+    var names = Object.keys(MF_REMOTES);
+    // Load all remote entry scripts first
+    return Promise.all(names.map(function (n) {
+      return loadRemoteEntryScript(MF_REMOTES[n].remoteEntry);
+    })).then(function () {
+      // Init containers sequentially so shared scope is populated by the first
+      var chain = Promise.resolve();
+      names.forEach(function (n) {
+        chain = chain.then(function () {
+          if (mfInitialized[n]) return;
+          return initMFContainer(n);
+        });
+      });
+      return chain;
+    }).then(function () {
+      // Load exposed modules
+      return Promise.all(names.map(function (n) {
+        if (mfInitialized[n]) return Promise.resolve(MF_REMOTES[n].element);
+        return loadMFExposedModule(n, MF_REMOTES[n].exposedModule).then(function () {
+          mfInitialized[n] = true;
+          return MF_REMOTES[n].element;
+        });
+      }));
+    });
+  }
+
+  // =========================================================================
+  // Native Federation loader (for Angular 20 MFEs)
+  // =========================================================================
+
+  var NF_REMOTES = {
+    'mfe-angular20': {
+      remoteEntry: '/mfe/angular20/remoteEntry.json',
+      baseUrl: '/mfe/angular20/',
+      element: '<mfe-angular20></mfe-angular20>'
+    },
+    'mfe-angular20-b': {
+      remoteEntry: '/mfe/angular20-b/remoteEntry.json',
+      baseUrl: '/mfe/angular20-b/',
+      element: '<mfe-angular20-b></mfe-angular20-b>'
+    }
+  };
+
+  var nfInitialized = false;
+  var nfImportMapInjected = false;
+  var nfEntries = {};
+
+  function waitForImportShim() {
+    if (typeof importShim !== 'undefined') return Promise.resolve();
+    return new Promise(function (resolve) {
+      var check = setInterval(function () {
+        if (typeof importShim !== 'undefined') {
+          clearInterval(check);
+          resolve();
+        }
+      }, 50);
+    });
+  }
+
+  function fetchRemoteEntry(name) {
+    var remote = NF_REMOTES[name];
+    return fetch(remote.remoteEntry)
+      .then(function (res) {
+        if (!res.ok) throw new Error('Failed to fetch ' + remote.remoteEntry);
+        return res.json();
+      })
+      .then(function (entry) {
+        nfEntries[name] = entry;
+        return entry;
+      });
+  }
+
+  function buildImportMap(entries) {
+    var imports = {};
+
+    // Collect shared deps from all entries, first provider wins (dedup)
+    Object.keys(entries).forEach(function (name) {
+      var entry = entries[name];
+      var baseUrl = NF_REMOTES[name].baseUrl;
+
+      // shared contains array of shared package descriptors
+      if (entry.shared) {
+        entry.shared.forEach(function (pkg) {
+          var key = pkg.packageName || pkg.id;
+          if (key && !imports[key]) {
+            imports[key] = baseUrl + pkg.outFileName;
+          }
+        });
+      }
+    });
+
+    return { imports: imports };
+  }
+
+  function injectImportMap(map) {
+    if (nfImportMapInjected) return;
+    nfImportMapInjected = true;
+
+    var script = document.createElement('script');
+    script.type = 'importmap-shim';
+    script.textContent = JSON.stringify(map);
+    document.head.appendChild(script);
+  }
+
+  function loadNFExposedModule(name) {
+    var entry = nfEntries[name];
+    var baseUrl = NF_REMOTES[name].baseUrl;
+
+    // Find the exposed bootstrap module
+    var exposed = null;
+    if (entry.exposes) {
+      entry.exposes.forEach(function (e) {
+        if (e.key === './bootstrap') {
+          exposed = e;
+        }
+      });
+    }
+
+    if (!exposed) {
+      throw new Error('No ./bootstrap exposed in ' + name);
+    }
+
+    var moduleUrl = baseUrl + exposed.outFileName;
+    return importShim(moduleUrl);
+  }
+
+  function loadAllAngular20Mfes() {
+    var names = Object.keys(NF_REMOTES);
+
+    if (nfInitialized) {
+      return Promise.resolve(names.map(function (n) {
+        return NF_REMOTES[n].element;
+      }));
+    }
+
+    // Fetch all remote entries in parallel
+    return Promise.all(names.map(function (n) {
+      return fetchRemoteEntry(n);
+    })).then(function () {
+      // Build and inject import map
+      var map = buildImportMap(nfEntries);
+      injectImportMap(map);
+
+      // Wait for es-module-shims to be ready, then small delay to process import map
+      return waitForImportShim().then(function () {
+        return new Promise(function (resolve) { setTimeout(resolve, 50); });
+      });
+    }).then(function () {
+      // Load exposed modules
+      return Promise.all(names.map(function (n) {
+        return loadNFExposedModule(n);
+      }));
+    }).then(function () {
+      nfInitialized = true;
+      return names.map(function (n) {
+        return NF_REMOTES[n].element;
+      });
+    });
+  }
+
+  function loadSingleAngular20Mfe(name) {
+    if (nfInitialized) {
+      return Promise.resolve(NF_REMOTES[name].element);
+    }
+    // For single load, we still need to load all NF entries to build the import map
+    return loadAllAngular20Mfes().then(function () {
+      return NF_REMOTES[name].element;
+    });
+  }
+
+  // =========================================================================
+  // Router
+  // =========================================================================
 
   function renderHome() {
     container.innerHTML =
       '<div class="home-content">' +
         '<h2>Welcome to the Microfrontend Demo</h2>' +
-        '<p>This demo shows two Angular microfrontends (v14 and v20) running simultaneously in a framework-agnostic shell.</p>' +
-        '<p>Each MFE is packaged as a Web Component using @angular/elements. Zone.js is loaded once by the shell and shared across all MFEs.</p>' +
-        '<p>Use the navigation above to load each MFE individually or both at once.</p>' +
+        '<p>This demo shows four Angular microfrontends (two v14, two v20) running simultaneously in a framework-agnostic shell.</p>' +
+        '<p>Angular 14 MFEs share their framework via <strong>Webpack Module Federation</strong>. Angular 20 MFEs share theirs via <strong>Native Federation</strong> (import maps).</p>' +
+        '<p>Use the navigation above to load each group individually or all four at once.</p>' +
       '</div>';
   }
 
-  function renderMfe(name) {
-    container.innerHTML = '<p style="text-align:center;padding:2rem;color:#888;">Loading ' + name + '...</p>';
-    loadMfe(name).then(function (element) {
-      container.innerHTML = element;
-    }).catch(function (err) {
-      container.innerHTML = '<p style="text-align:center;padding:2rem;color:#c44;">Error loading ' + name + ': ' + err.message + '</p>';
-    });
+  function renderLoading(msg) {
+    container.innerHTML = '<p style="text-align:center;padding:2rem;color:#888;">' + msg + '</p>';
   }
 
-  function renderBoth() {
-    container.innerHTML = '<p style="text-align:center;padding:2rem;color:#888;">Loading microfrontends...</p>';
-    Promise.all([loadMfe('angular14'), loadMfe('angular20')]).then(function (elements) {
+  function renderError(err) {
+    container.innerHTML = '<p style="text-align:center;padding:2rem;color:#c44;">Error: ' + err.message + '</p>';
+    console.error(err);
+  }
+
+  function renderAngular14() {
+    renderLoading('Loading Angular 14 MFEs (Module Federation)...');
+    loadAllAngular14Mfes().then(function (elements) {
       container.innerHTML = '<div class="mfe-row">' + elements.join('') + '</div>';
-    }).catch(function (err) {
-      container.innerHTML = '<p style="text-align:center;padding:2rem;color:#c44;">Error: ' + err.message + '</p>';
-    });
+    }).catch(renderError);
+  }
+
+  function renderAngular20() {
+    renderLoading('Loading Angular 20 MFEs (Native Federation)...');
+    loadAllAngular20Mfes().then(function (elements) {
+      container.innerHTML = '<div class="mfe-row">' + elements.join('') + '</div>';
+    }).catch(renderError);
+  }
+
+  function renderAll() {
+    renderLoading('Loading all microfrontends...');
+    Promise.all([
+      loadAllAngular14Mfes(),
+      loadAllAngular20Mfes()
+    ]).then(function (results) {
+      var mf14Elements = results[0];
+      var nfElements = results[1];
+      container.innerHTML =
+        '<h3 class="section-label">Angular 14 (Module Federation)</h3>' +
+        '<div class="mfe-row">' + mf14Elements.join('') + '</div>' +
+        '<h3 class="section-label">Angular 20 (Native Federation)</h3>' +
+        '<div class="mfe-row">' + nfElements.join('') + '</div>';
+    }).catch(renderError);
   }
 
   function getRoute() {
@@ -80,13 +314,13 @@
 
     switch (route) {
       case 'angular14':
-        renderMfe('angular14');
+        renderAngular14();
         break;
       case 'angular20':
-        renderMfe('angular20');
+        renderAngular20();
         break;
-      case 'both':
-        renderBoth();
+      case 'all':
+        renderAll();
         break;
       default:
         renderHome();

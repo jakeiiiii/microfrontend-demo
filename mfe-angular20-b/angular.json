@@ -3,31 +3,10 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "mfe-angular20": {
+    "mfe-angular20-b": {
       "projectType": "application",
       "schematics": {
-        "@schematics/angular:class": {
-          "skipTests": true
-        },
         "@schematics/angular:component": {
-          "skipTests": true
-        },
-        "@schematics/angular:directive": {
-          "skipTests": true
-        },
-        "@schematics/angular:guard": {
-          "skipTests": true
-        },
-        "@schematics/angular:interceptor": {
-          "skipTests": true
-        },
-        "@schematics/angular:pipe": {
-          "skipTests": true
-        },
-        "@schematics/angular:resolver": {
-          "skipTests": true
-        },
-        "@schematics/angular:service": {
           "skipTests": true
         }
       },
@@ -38,14 +17,14 @@
         "build": {
           "builder": "@angular-architects/native-federation:build",
           "options": {
-            "target": "mfe-angular20:build-esbuild:production"
+            "target": "mfe-angular20-b:build-esbuild:production"
           },
           "configurations": {
             "production": {
-              "target": "mfe-angular20:build-esbuild:production"
+              "target": "mfe-angular20-b:build-esbuild:production"
             },
             "development": {
-              "target": "mfe-angular20:build-esbuild:development",
+              "target": "mfe-angular20-b:build-esbuild:development",
               "dev": true
             }
           },
@@ -94,14 +73,14 @@
         "serve": {
           "builder": "@angular-architects/native-federation:dev-server",
           "options": {
-            "target": "mfe-angular20:serve-original:development"
+            "target": "mfe-angular20-b:serve-original:development"
           },
           "configurations": {
             "production": {
-              "target": "mfe-angular20:serve-original:production"
+              "target": "mfe-angular20-b:serve-original:production"
             },
             "development": {
-              "target": "mfe-angular20:serve-original:development",
+              "target": "mfe-angular20-b:serve-original:development",
               "dev": true
             }
           },
@@ -111,35 +90,13 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "mfe-angular20:build-esbuild:production"
+              "buildTarget": "mfe-angular20-b:build-esbuild:production"
             },
             "development": {
-              "buildTarget": "mfe-angular20:build-esbuild:development"
+              "buildTarget": "mfe-angular20-b:build-esbuild:development"
             }
           },
           "defaultConfiguration": "development"
-        },
-        "extract-i18n": {
-          "builder": "@angular/build:extract-i18n"
-        },
-        "test": {
-          "builder": "@angular/build:karma",
-          "options": {
-            "polyfills": [
-              "zone.js",
-              "zone.js/testing"
-            ],
-            "tsConfig": "tsconfig.spec.json",
-            "assets": [
-              {
-                "glob": "**/*",
-                "input": "public"
-              }
-            ],
-            "styles": [
-              "src/styles.css"
-            ]
-          }
         }
       }
     }

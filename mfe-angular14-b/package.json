@@ -1,5 +1,5 @@
 {
-  "name": "mfe-angular14",
+  "name": "mfe-angular14-b",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
@@ -24,18 +24,11 @@
     "zone.js": "~0.11.4"
   },
   "devDependencies": {
-    "@angular-architects/module-federation": "~14.3.0",
     "@angular-devkit/build-angular": "^14.2.13",
     "@angular/cli": "~14.2.13",
     "@angular/compiler-cli": "^14.2.0",
-    "@types/jasmine": "~4.0.0",
+    "@angular-architects/module-federation": "~14.3.0",
     "@types/node": "^16.18.126",
-    "jasmine-core": "~4.3.0",
-    "karma": "~6.4.0",
-    "karma-chrome-launcher": "~3.1.0",
-    "karma-coverage": "~2.2.0",
-    "karma-jasmine": "~5.1.0",
-    "karma-jasmine-html-reporter": "~2.0.0",
     "ngx-build-plus": "^14.0.0",
     "typescript": "~4.7.2"
   }

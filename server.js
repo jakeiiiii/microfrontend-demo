@@ -7,14 +7,24 @@ const PORT = 4000;
 // Serve shell app
 app.use(express.static(path.join(__dirname, 'shell-app')));
 
-// Serve Angular 14 MFE dist
+// Serve Angular 14 MFE A dist
 app.use('/mfe/angular14', express.static(
   path.join(__dirname, 'mfe-angular14', 'dist', 'mfe-angular14')
 ));
 
-// Serve Angular 20 MFE dist (note: output is in browser/ subdirectory)
+// Serve Angular 14 MFE B dist
+app.use('/mfe/angular14-b', express.static(
+  path.join(__dirname, 'mfe-angular14-b', 'dist', 'mfe-angular14-b')
+));
+
+// Serve Angular 20 MFE A dist (note: output is in browser/ subdirectory)
 app.use('/mfe/angular20', express.static(
   path.join(__dirname, 'mfe-angular20', 'dist', 'mfe-angular20', 'browser')
+));
+
+// Serve Angular 20 MFE B dist (note: output is in browser/ subdirectory)
+app.use('/mfe/angular20-b', express.static(
+  path.join(__dirname, 'mfe-angular20-b', 'dist', 'mfe-angular20-b', 'browser')
 ));
 
 // Fallback to shell index.html for SPA routing
