@@ -106,6 +106,50 @@
   }
 
   // =========================================================================
+  // React MFE loader (Webpack Module Federation)
+  // =========================================================================
+
+  var REACT_REMOTES = {
+    mfeReact: {
+      remoteEntry: '/mfe/react/remoteEntry.js',
+      exposedModule: './bootstrap',
+      element: '<mfe-react></mfe-react>'
+    }
+  };
+
+  var reactSharedScope = null;
+  var reactInitialized = {};
+
+  function loadAllReactMfes() {
+    var names = Object.keys(REACT_REMOTES);
+    return Promise.all(names.map(function (n) {
+      return loadRemoteEntryScript(REACT_REMOTES[n].remoteEntry);
+    })).then(function () {
+      var chain = Promise.resolve();
+      names.forEach(function (n) {
+        chain = chain.then(function () {
+          if (reactInitialized[n]) return;
+          var cont = window[n];
+          if (!cont) throw new Error('Container ' + n + ' not found on window');
+          if (!reactSharedScope) reactSharedScope = {};
+          return Promise.resolve(cont.init(reactSharedScope)).then(function () {
+            return cont;
+          });
+        });
+      });
+      return chain;
+    }).then(function () {
+      return Promise.all(names.map(function (n) {
+        if (reactInitialized[n]) return Promise.resolve(REACT_REMOTES[n].element);
+        return loadMFExposedModule(n, REACT_REMOTES[n].exposedModule).then(function () {
+          reactInitialized[n] = true;
+          return REACT_REMOTES[n].element;
+        });
+      }));
+    });
+  }
+
+  // =========================================================================
   // Native Federation loader (for Angular 20 MFEs)
   // =========================================================================
 
@@ -262,9 +306,9 @@
     container.innerHTML =
       '<div class="home-content">' +
         '<h2>Welcome to the Microfrontend Demo</h2>' +
-        '<p>This demo shows six Angular microfrontends (three v14, three v20) running simultaneously in a framework-agnostic shell.</p>' +
-        '<p>Angular 14 MFEs share their framework via <strong>Webpack Module Federation</strong>. Angular 20 MFEs share theirs via <strong>Native Federation</strong> (import maps).</p>' +
-        '<p>Use the navigation above to load each group individually or all four at once.</p>' +
+        '<p>This demo shows seven microfrontends (three Angular 14, three Angular 20, one React) running simultaneously in a framework-agnostic shell.</p>' +
+        '<p>Angular 14 and React MFEs share dependencies via <strong>Webpack Module Federation</strong>. Angular 20 MFEs share theirs via <strong>Native Federation</strong> (import maps).</p>' +
+        '<p>Use the navigation above to load each group individually or all at once.</p>' +
       '</div>';
   }
 
@@ -291,19 +335,30 @@
     }).catch(renderError);
   }
 
+  function renderReact() {
+    renderLoading('Loading React MFEs (Module Federation)...');
+    loadAllReactMfes().then(function (elements) {
+      container.innerHTML = '<div class="mfe-row">' + elements.join('') + '</div>';
+    }).catch(renderError);
+  }
+
   function renderAll() {
     renderLoading('Loading all microfrontends...');
     Promise.all([
       loadAllAngular14Mfes(),
-      loadAllAngular20Mfes()
+      loadAllAngular20Mfes(),
+      loadAllReactMfes()
     ]).then(function (results) {
       var mf14Elements = results[0];
       var nfElements = results[1];
+      var reactElements = results[2];
       container.innerHTML =
         '<h3 class="section-label">Angular 14 (Module Federation)</h3>' +
         '<div class="mfe-row">' + mf14Elements.join('') + '</div>' +
         '<h3 class="section-label">Angular 20 (Native Federation)</h3>' +
-        '<div class="mfe-row">' + nfElements.join('') + '</div>';
+        '<div class="mfe-row">' + nfElements.join('') + '</div>' +
+        '<h3 class="section-label">React (Module Federation)</h3>' +
+        '<div class="mfe-row">' + reactElements.join('') + '</div>';
     }).catch(renderError);
   }
 
@@ -328,6 +383,9 @@
         break;
       case 'angular20':
         renderAngular20();
+        break;
+      case 'react':
+        renderReact();
         break;
       case 'all':
         renderAll();

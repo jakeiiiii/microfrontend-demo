@@ -22,6 +22,11 @@ app.use('/mfe/angular14-c', express.static(
   path.join(__dirname, 'mfe-angular14-c', 'dist', 'mfe-angular14-c')
 ));
 
+// Serve React MFE dist
+app.use('/mfe/react', express.static(
+  path.join(__dirname, 'mfe-react', 'dist')
+));
+
 // Serve Angular 20 MFE A dist (note: output is in browser/ subdirectory)
 app.use('/mfe/angular20', express.static(
   path.join(__dirname, 'mfe-angular20', 'dist', 'mfe-angular20', 'browser')
