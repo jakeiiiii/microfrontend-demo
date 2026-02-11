@@ -1,24 +1,25 @@
 # Microfrontend Demo
 
-Six Angular microfrontends (three Angular 14, three Angular 20) running simultaneously in a framework-agnostic shell, sharing framework code via federation.
+Seven microfrontends (three Angular 14, three Angular 20, one React) running simultaneously in a framework-agnostic shell, sharing framework code via federation.
 
 ## Architecture
 
 ```
-shell-app/          Vanilla HTML/CSS/JS - dual federation loaders + hash router
+shell-app/          Vanilla HTML/CSS/JS - federation loaders + hash router
 mfe-angular14/      Angular 14 MFE A (blue)      ┐
 mfe-angular14-b/    Angular 14 MFE B (orange)     ├─ Webpack Module Federation
 mfe-angular14-c/    Angular 14 MFE C (purple)     ┘
 mfe-angular20/      Angular 20 MFE A (red)        ┐
 mfe-angular20-b/    Angular 20 MFE B (green)      ├─ Native Federation (import maps)
 mfe-angular20-c/    Angular 20 MFE C (teal)       ┘
+mfe-react/          React MFE (cyan)              ── Webpack Module Federation
 server.js           Express static file server
 build.bat           Orchestrated build with nvm Node version switching
 ```
 
-Each Angular MFE is packaged as a **Web Component** using `@angular/elements`. The shell dynamically loads MFE bundles and renders their custom elements.
+Each MFE is packaged as a **Web Component** (custom element). The shell dynamically loads MFE bundles and renders their custom elements.
 
-**Angular 14 MFEs** share a single copy of the Angular 14 framework via **Webpack Module Federation** (shared scope protocol). **Angular 20 MFEs** share a single copy of the Angular 20 framework via **Native Federation** (ES module import maps + es-module-shims). Zone.js is loaded once by the shell and shared by all MFEs.
+**Angular 14 MFEs** share a single copy of the Angular 14 framework via **Webpack Module Federation** (shared scope protocol). **Angular 20 MFEs** share a single copy of the Angular 20 framework via **Native Federation** (ES module import maps + es-module-shims). The **React MFE** uses **Webpack Module Federation** with a separate shared scope (isolating React deps from Angular deps). Zone.js is loaded once by the shell and shared by all Angular MFEs.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical details.
 
@@ -40,11 +41,12 @@ cd mfe-angular14 && npm install && cd ..
 cd mfe-angular14-b && npm install && cd ..
 cd mfe-angular14-c && npm install && cd ..
 
-# Angular 20 MFEs (Node 25)
+# Angular 20 MFEs and React MFE (Node 25)
 nvm use 25.6.0
 cd mfe-angular20 && npm install && cd ..
 cd mfe-angular20-b && npm install && cd ..
 cd mfe-angular20-c && npm install && cd ..
+cd mfe-react && npm install && cd ..
 
 # Server (any Node version)
 npm install
@@ -58,7 +60,7 @@ From an Administrator terminal:
 build.bat
 ```
 
-This switches Node versions via nvm and builds all 6 MFEs.
+This switches Node versions via nvm and builds all 7 MFEs.
 
 ## Run
 
@@ -75,12 +77,14 @@ Open http://localhost:4000
 | `#/home` | Welcome page |
 | `#/angular14` | All three Angular 14 MFEs (demonstrates Webpack MF sharing) |
 | `#/angular20` | All three Angular 20 MFEs (demonstrates Native Federation sharing) |
-| `#/all` | All six MFEs simultaneously |
+| `#/react` | React MFE (demonstrates cross-framework Webpack MF) |
+| `#/all` | All seven MFEs simultaneously |
 
 ## How It Works
 
-- **Shell** loads Zone.js from CDN, es-module-shims for import map support, and provides hash-based routing with two federation loaders
+- **Shell** loads Zone.js from CDN, es-module-shims for import map support, and provides hash-based routing with three federation loaders
 - **Angular 14 MFEs** use `ngx-build-plus` + Webpack Module Federation. The shell creates a shared scope, calls `container.init(scope)` on each — first MFE populates shared modules, subsequent MFEs reuse them
 - **Angular 20 MFEs** use `@angular-architects/native-federation`. The shell fetches `remoteEntry.json` from each, builds a deduplicated import map, and loads modules via `importShim()`
-- **Zone.js** is excluded from all MFE builds to avoid duplicate patching
-- Each additional MFE adds only ~5-10KB (app code) since the framework is already shared
+- **React MFE** uses Webpack Module Federation with the same `library: { type: 'var' }` pattern as Angular 14 MFEs, but with a separate shared scope to isolate React deps from Angular deps
+- **Zone.js** is excluded from all Angular MFE builds to avoid duplicate patching
+- Each additional MFE of the same framework adds only ~5-10KB (app code) since the framework is already shared

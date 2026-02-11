@@ -2,9 +2,9 @@
 
 ## Overview
 
-This project demonstrates a microfrontend architecture where six Angular applications (three Angular 14, three Angular 20) run simultaneously within a single browser page. The shell application is framework-agnostic (vanilla HTML/CSS/JS). Each microfrontend is packaged as a Web Component using `@angular/elements`.
+This project demonstrates a microfrontend architecture where seven applications (three Angular 14, three Angular 20, one React) run simultaneously within a single browser page. The shell application is framework-agnostic (vanilla HTML/CSS/JS). Each microfrontend is packaged as a Web Component (custom element).
 
-Angular 14 MFEs share a single copy of the Angular 14 framework via **Webpack Module Federation**. Angular 20 MFEs share a single copy of the Angular 20 framework via **Native Federation** (import maps). This eliminates the duplicate framework overhead that would otherwise grow linearly with each additional MFE.
+Angular 14 MFEs share a single copy of the Angular 14 framework via **Webpack Module Federation**. Angular 20 MFEs share a single copy of the Angular 20 framework via **Native Federation** (import maps). The React MFE uses **Webpack Module Federation** with a separate shared scope, demonstrating that the architecture is truly cross-framework. This eliminates the duplicate framework overhead that would otherwise grow linearly with each additional MFE.
 
 ## Problem Statement
 
@@ -28,12 +28,12 @@ Despite these build-time incompatibilities, the compiled JavaScript output from 
 │  ┌────────────────────────────────────────────────────────────────┐   │
 │  │                  Shell App (Vanilla JS)                         │   │
 │  │                                                                │   │
-│  │  ┌──────────┐  ┌───────────────────┐  ┌────────────────────┐  │   │
-│  │  │  Router   │  │  MF Loader        │  │  NF Loader         │  │   │
-│  │  │  (hash)   │  │  (Webpack MF)     │  │  (Import Maps)     │  │   │
-│  │  └────┬─────┘  └────────┬──────────┘  └─────────┬──────────┘  │   │
-│  │       │                 │                        │             │   │
-│  │  ┌────┴─────────────────┴────────────────────────┴──────────┐  │   │
+│  │  ┌──────────┐  ┌──────────────┐  ┌──────────────┐  ┌───────┐ │   │
+│  │  │  Router   │  │  MF Loader   │  │  NF Loader   │  │ React │ │   │
+│  │  │  (hash)   │  │  (Ng14 MF)   │  │ (Import Maps)│  │Loader │ │   │
+│  │  └────┬─────┘  └──────┬───────┘  └──────┬───────┘  └───┬───┘ │   │
+│  │       │               │                  │              │      │   │
+│  │  ┌────┴───────────────┴──────────────────┴──────────────┴───┐  │   │
 │  │  │                    MFE Container                          │  │   │
 │  │  │                                                           │  │   │
 │  │  │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐      │  │   │
@@ -49,11 +49,17 @@ Despite these build-time incompatibilities, the compiled JavaScript output from 
 │  │  │  │ Shared Ng20  │ │ Shared Ng20  │ │ Shared Ng20  │      │  │   │
 │  │  │  │ Runtime ─────┼─┤ Runtime ─────┼─┤ Runtime      │      │  │   │
 │  │  │  └─────────────┘ └──────────────┘ └──────────────┘      │  │   │
+│  │  │                                                           │  │   │
+│  │  │  ┌─────────────┐                                         │  │   │
+│  │  │  │<mfe-react>   │                                         │  │   │
+│  │  │  │ React 19     │                                         │  │   │
+│  │  │  │ (own scope)  │                                         │  │   │
+│  │  │  └─────────────┘                                         │  │   │
 │  │  └───────────────────────────────────────────────────────────┘  │   │
 │  └────────────────────────────────────────────────────────────────┘   │
 │                                                                       │
 │  ┌────────────────────────────────────────────────────────────────┐   │
-│  │  Zone.js (loaded once by shell)                                │   │
+│  │  Zone.js (loaded once by shell, used by Angular MFEs)          │   │
 │  │  es-module-shims (polyfill for dynamic import maps)            │   │
 │  └────────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────┘
@@ -61,9 +67,10 @@ Despite these build-time incompatibilities, the compiled JavaScript output from 
 
 ### Why Web Components + Federation
 
-- **Framework agnostic**: The shell has zero Angular dependencies. MFEs register as standard Custom Elements.
-- **Encapsulation**: Each MFE manages its own component tree, change detection, and dependency injection.
-- **Shared framework code**: MFEs of the same Angular version share one copy of the framework via federation, eliminating duplicate bundles.
+- **Framework agnostic**: The shell has zero framework dependencies. MFEs register as standard Custom Elements.
+- **Cross-framework**: Angular 14, Angular 20, and React MFEs coexist in the same page, proving the architecture is not tied to any single framework.
+- **Encapsulation**: Each MFE manages its own component tree, change detection, and state.
+- **Shared framework code**: MFEs of the same framework share one copy via federation, eliminating duplicate bundles.
 - **Lazy loading**: MFE bundles are loaded on demand via dynamic script/module injection.
 - **Independently deployable**: Each MFE can be built and deployed separately.
 
@@ -107,6 +114,14 @@ microfrontend-demo/
 │   ├── federation.config.js    # Native Federation config
 │   ├── angular.json            # NF builder wrapping @angular/build
 │   └── src/
+│
+├── mfe-react/                  # React MFE (cyan #00bcd4)
+│   ├── webpack.config.js       # Webpack Module Federation config
+│   ├── .babelrc                # Babel presets (env + react)
+│   └── src/
+│       ├── index.jsx           # Registers <mfe-react> custom element
+│       ├── App.jsx             # Counter card component
+│       └── styles.css          # Cyan-themed styles
 │
 ├── server.js                   # Express static file server
 └── build.bat                   # Multi-step build with nvm switching
@@ -244,7 +259,7 @@ import { createApplication } from '@angular/platform-browser';
 1. Load Zone.js once from CDN (shared global dependency)
 2. Load es-module-shims for Native Federation support
 3. Render navigation header
-4. Route based on URL hash (`#/angular14`, `#/angular20`, `#/all`)
+4. Route based on URL hash (`#/angular14`, `#/angular20`, `#/react`, `#/all`)
 5. Load MFE bundles on demand via two federation loaders
 6. Render MFE custom elements into the container
 
@@ -254,6 +269,7 @@ import { createApplication } from '@angular/platform-browser';
 |--------|----------|------|-------------|
 | Module Federation | Webpack shared scope | Angular 14 (A, B, C) | `remoteEntry.js` |
 | Native Federation | ES module import maps | Angular 20 (A, B, C) | `remoteEntry.json` |
+| React MF Loader | Webpack shared scope (separate) | React | `remoteEntry.js` |
 
 ### Angular 14 MFEs (A, B, C)
 
@@ -297,6 +313,35 @@ import { createApplication } from '@angular/platform-browser';
 - Standalone component (no NgModule)
 - `federation.config.js`: `skip` list for Node-only packages (oxc-parser, etc.)
 
+### React MFE
+
+| MFE | Custom Element | Theme Color | Container Name |
+|-----|---------------|-------------|----------------|
+| React | `<mfe-react>` | Cyan #00bcd4 | `mfeReact` |
+
+**Build tooling**: Webpack 5 with `ModuleFederationPlugin` + Babel (preset-env, preset-react).
+
+**Bootstrap sequence**:
+1. `index.jsx` defines a class extending `HTMLElement`
+2. `connectedCallback()` calls `createRoot(this).render(<App />)`
+3. `customElements.define('mfe-react', ...)` registers the custom element
+
+**Webpack Module Federation config**:
+```js
+new ModuleFederationPlugin({
+  name: 'mfeReact',
+  library: { type: 'var', name: 'mfeReact' },  // window global
+  filename: 'remoteEntry.js',
+  exposes: { './bootstrap': './src/index.jsx' },
+  shared: {
+    react: { singleton: true, eager: true },
+    'react-dom': { singleton: true, eager: true },
+  },
+})
+```
+
+**Separate shared scope**: The shell uses a dedicated `reactSharedScope` (not `mfSharedScope` used by Angular 14 MFEs). React and Angular have no shared dependencies, so isolated scopes are cleaner. If additional React MFEs are added, they would share React/ReactDOM through this scope.
+
 ## Zone.js Sharing Strategy
 
 Zone.js monkey-patches browser APIs (setTimeout, Promise, addEventListener, etc.) to enable Angular's change detection. Loading it multiple times causes errors because the patches are applied globally and are not idempotent.
@@ -314,7 +359,7 @@ Zone.js monkey-patches browser APIs (setTimeout, Promise, addEventListener, etc.
 Angular 14 and 20 cannot be built with the same Node.js version. The build script (`build.bat`) orchestrates this using nvm:
 
 ```
-build.bat (8 steps)
+build.bat (9 steps)
   ├── nvm use 16.20.2
   ├── ng build mfe-angular14         (step 1)
   ├── ng build mfe-angular14-b       (step 2)
@@ -322,7 +367,8 @@ build.bat (8 steps)
   ├── nvm use 25.6.0
   ├── ng build mfe-angular20         (step 4)
   ├── ng build mfe-angular20-b       (step 5)
-  └── ng build mfe-angular20-c       (step 6)
+  ├── ng build mfe-angular20-c       (step 6)
+  └── webpack mfe-react              (step 7, still on Node 25)
 ```
 
 **Requires**: Administrator terminal on Windows (nvm symlink requires elevated privileges).
@@ -347,6 +393,11 @@ mfe-angular20-b/dist/mfe-angular20-b/browser/
   ├── remoteEntry.json      (manifest — shared chunks have same names as MFE A)
   ├── bootstrap-*.js        (app-specific bootstrap)
   └── @nf-internal/chunk-*  (identical chunk names → import map deduplicates)
+
+mfe-react/dist/
+  ├── remoteEntry.js        (Module Federation container)
+  ├── main.js               (entry with eager React/ReactDOM)
+  └── *.main.js             (vendor chunks)
 ```
 
 ## Server Architecture
@@ -362,6 +413,7 @@ Express.js serves static files with path mapping:
 | `/mfe/angular20/*` | `mfe-angular20/dist/mfe-angular20/browser/*` |
 | `/mfe/angular20-b/*` | `mfe-angular20-b/dist/mfe-angular20-b/browser/*` |
 | `/mfe/angular20-c/*` | `mfe-angular20-c/dist/mfe-angular20-c/browser/*` |
+| `/mfe/react/*` | `mfe-react/dist/*` |
 
 Note the `browser/` subdirectory for Angular 20 — the `@angular/build:application` builder outputs to a `browser/` folder (it also supports SSR output in a `server/` folder).
 
@@ -426,6 +478,10 @@ The two Angular major versions (14 and 20) remain fully isolated — they share 
 **Adding a new Angular 14 MFE**: Copy an existing Angular 14 MFE directory, change the Module Federation `name` and `library.name`, update the custom element tag and `publicPath`, add it to `MF_REMOTES` in `app.js`, add a server route, and add the build step to `build.bat`.
 
 **Adding a new Angular 20 MFE**: Copy an existing Angular 20 MFE directory, change the federation `name`, update the custom element tag, add it to `NF_REMOTES` in `app.js`, add a server route, and add the build step to `build.bat`.
+
+**Adding a new React MFE**: Copy `mfe-react/`, change the Module Federation `name` and `library.name`, update the custom element tag and `publicPath`, add it to `REACT_REMOTES` in `app.js`, add a server route, and add the build step to `build.bat`. It will share React/ReactDOM with the existing React MFE through `reactSharedScope`.
+
+**Adding a different framework (Vue, Svelte, etc.)**: Follow the React MFE pattern — use Webpack Module Federation with `library: { type: 'var' }`, register as a custom element, create a new `*_REMOTES` registry and separate shared scope in `app.js`.
 
 **Cross-MFE communication**: Use `CustomEvent` dispatched on `window` or `document`, or implement a lightweight event bus in the shell.
 
