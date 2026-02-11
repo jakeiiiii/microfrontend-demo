@@ -17,6 +17,11 @@ app.use('/mfe/angular14-b', express.static(
   path.join(__dirname, 'mfe-angular14-b', 'dist', 'mfe-angular14-b')
 ));
 
+// Serve Angular 14 MFE C dist
+app.use('/mfe/angular14-c', express.static(
+  path.join(__dirname, 'mfe-angular14-c', 'dist', 'mfe-angular14-c')
+));
+
 // Serve Angular 20 MFE A dist (note: output is in browser/ subdirectory)
 app.use('/mfe/angular20', express.static(
   path.join(__dirname, 'mfe-angular20', 'dist', 'mfe-angular20', 'browser')
@@ -25,6 +30,11 @@ app.use('/mfe/angular20', express.static(
 // Serve Angular 20 MFE B dist (note: output is in browser/ subdirectory)
 app.use('/mfe/angular20-b', express.static(
   path.join(__dirname, 'mfe-angular20-b', 'dist', 'mfe-angular20-b', 'browser')
+));
+
+// Serve Angular 20 MFE C dist (note: output is in browser/ subdirectory)
+app.use('/mfe/angular20-c', express.static(
+  path.join(__dirname, 'mfe-angular20-c', 'dist', 'mfe-angular20-c', 'browser')
 ));
 
 // Fallback to shell index.html for SPA routing

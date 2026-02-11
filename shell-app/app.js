@@ -17,6 +17,11 @@
       remoteEntry: '/mfe/angular14-b/remoteEntry.js',
       exposedModule: './bootstrap',
       element: '<mfe-angular14-b></mfe-angular14-b>'
+    },
+    mfeAngular14C: {
+      remoteEntry: '/mfe/angular14-c/remoteEntry.js',
+      exposedModule: './bootstrap',
+      element: '<mfe-angular14-c></mfe-angular14-c>'
     }
   };
 
@@ -114,6 +119,11 @@
       remoteEntry: '/mfe/angular20-b/remoteEntry.json',
       baseUrl: '/mfe/angular20-b/',
       element: '<mfe-angular20-b></mfe-angular20-b>'
+    },
+    'mfe-angular20-c': {
+      remoteEntry: '/mfe/angular20-c/remoteEntry.json',
+      baseUrl: '/mfe/angular20-c/',
+      element: '<mfe-angular20-c></mfe-angular20-c>'
     }
   };
 
@@ -252,7 +262,7 @@
     container.innerHTML =
       '<div class="home-content">' +
         '<h2>Welcome to the Microfrontend Demo</h2>' +
-        '<p>This demo shows four Angular microfrontends (two v14, two v20) running simultaneously in a framework-agnostic shell.</p>' +
+        '<p>This demo shows six Angular microfrontends (three v14, three v20) running simultaneously in a framework-agnostic shell.</p>' +
         '<p>Angular 14 MFEs share their framework via <strong>Webpack Module Federation</strong>. Angular 20 MFEs share theirs via <strong>Native Federation</strong> (import maps).</p>' +
         '<p>Use the navigation above to load each group individually or all four at once.</p>' +
       '</div>';
